@@ -79,17 +79,10 @@ def transform_data(seq):
     return test_data
 
 class GeneDataset(Dataset):
-    """
-     root：图像存放地址根路径
-     augment：是否需要图像增强
-    """
     def __init__(self,sams,augment=None):
-        # 这个list存放所有图像的地址
         self.data_files = sams
 
     def __getitem__(self, index):
-        # 读取图像数据并返回
-        # 这里的open_image是读取图像函数，可以用PIL、opencv等库进行读取
         data_200 = self.data_files[index][0]
         data_400 = self.data_files[index][1]
         data_600 = self.data_files[index][2]
@@ -99,20 +92,17 @@ class GeneDataset(Dataset):
         return data_200,data_400,data_600,data_800,label,length
 
     def __len__(self):
-        # 返回图像的数量
         return len(self.data_files)
     
 
 
 
-# In[ ]:
-
 
 
 # 定义网络结构
-class CNNnet(torch.nn.Module):
+class CrepHANnet(torch.nn.Module):
     def __init__(self):
-        super(CNNnet,self).__init__()
+        super(CrepHANnet,self).__init__()
         self.hidden_size = 32
         self.rnn_one=torch.nn.LSTM(
             input_size=30,
@@ -247,7 +237,7 @@ class CNNnet(torch.nn.Module):
 
 
 def prediction(seq="ACTGGGTCAGTGCTA"):
-    model = CNNnet()
+    model = CrepHANnet()
     model.load_state_dict(torch.load("hierarchical.pt"))
     test_data = transform_data(seq)
     test_dataset = GeneDataset(test_data)
