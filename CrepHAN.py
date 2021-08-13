@@ -50,7 +50,7 @@ def seq_split(seq):
 
 # In[4]:
 
-
+###transfer seq to numpy
 def transform_data(seq):
     bases = seq_split(seq)
     data_200 = np.zeros([200,30])
@@ -78,6 +78,7 @@ def transform_data(seq):
     test_data.append([data_200,data_400,data_600,data_800,0,int((len(bases)-1))])
     return test_data
 
+###build the gene dataset
 class GeneDataset(Dataset):
     def __init__(self,sams,augment=None):
         self.data_files = sams
@@ -99,7 +100,7 @@ class GeneDataset(Dataset):
 
 
 
-# 定义网络结构
+###define the net architecture
 class CrepHANnet(torch.nn.Module):
     def __init__(self):
         super(CrepHANnet,self).__init__()
@@ -175,14 +176,14 @@ class CrepHANnet(torch.nn.Module):
         self.out_2=nn.Linear(in_features=self.hidden_size,out_features=2)
         self.soft = nn.Softmax(dim=1)
     def forward(self, x1,x2,x3,x4,l1):
-        ###对四个句子分别做LSTM
+        ###using LSTM for four input
         output_200,(h_n,c_n)=self.rnn_one(x1)
         output_400,(h_n,c_n)=self.rnn_two(x2)
         output_600,(h_n,c_n)=self.rnn_three(x3)
         output_800,(h_n,c_n)=self.rnn_four(x4)
         
         output = torch.cat([output_200,output_400,output_600,output_800],dim=1)
-        #mask掉多于长度的部分
+        #mask the extra part
         ones = torch.zeros([len(output),Max_length,self.hidden_size*2])
         for i in range(len(l1)):
             for j in range(l1[i]):
@@ -190,43 +191,43 @@ class CrepHANnet(torch.nn.Module):
                     break
                 ones[i][j] = torch.ones(self.hidden_size*2)
         output = ones.mul(output)
-        ####重新分成四个句子
+        ####split to four part
         output_200 = output[:,0:200,:]
         output_400 = output[:,200:400,:]
         output_600 = output[:,400:600,:]
         output_800 = output[:,600:800,:]
         
-        ###对前200进行attention
+        ###attention for pre-200
         result_200 = self.projection_200(output_200)
         weights_200 = F.softmax(result_200.squeeze(-1), dim=1)
         output_200 = (output_200 * weights_200.unsqueeze(-1)).sum(dim=1)
         
-        ###对前400进行attention
+        ###attention for [200,400]
         result_400 = self.projection_400(output_400)
         weights_400 = F.softmax(result_400.squeeze(-1), dim=1)
         output_400 = (output_400 * weights_400.unsqueeze(-1)).sum(dim=1)
         
-        ###对前600进行attention
+        ###attention for [400,600]
         result_600 = self.projection_600(output_600)
         weights_600 = F.softmax(result_600.squeeze(-1), dim=1)
         output_600 = (output_600 * weights_600.unsqueeze(-1)).sum(dim=1)
         
-        ###对前800进行attention
+        ###attention for [600, 800]
         result_800 = self.projection_800(output_800)
         weights_800 = F.softmax(result_800.squeeze(-1), dim=1)
         output_800 = (output_800 * weights_800.unsqueeze(-1)).sum(dim=1)
         
-        ###合并四个部分
+        ###concat four parts
         output = torch.cat([output_200.unsqueeze(-1),output_400.unsqueeze(-1),
                             output_600.unsqueeze(-1),output_800.unsqueeze(-1)],dim=2).permute(0,2,1)
         #print(output.size())
         
-        ###做句子的attention
+        ###seq attention
         result = self.projection(output)
         weights = F.softmax(result.squeeze(-1), dim=1)
         output = (output * weights.unsqueeze(-1)).sum(dim=1)
         
-        ###全连接层算概率
+        ###calculate the logits
         output=self.out_1(output)
         output=self.out_2(output)
         out_soft = self.soft(output)
@@ -241,7 +242,7 @@ def prediction(seq="ACTGGGTCAGTGCTA"):
     model.load_state_dict(torch.load("hierarchical.pt"))
     test_data = transform_data(seq)
     test_dataset = GeneDataset(test_data)
-    # 利用dataloader读取我们的数据对象，并设定batch-size和工作现场
+    # using dataloader to define the test input
     test_loader = DataLoader(test_dataset, batch_size=Batch_size, num_workers=0, shuffle=False)
     for j in test_loader:
         model.eval()
